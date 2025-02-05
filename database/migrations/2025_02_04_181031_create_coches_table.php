@@ -14,6 +14,10 @@ return new class extends Migration
         Schema::create('coches', function (Blueprint $table) {
             $table->id();
             $table->string('marca');
+            $table->string('modelo');
+            $table->integer('anio');
+            $table->decimal('precio', 10, 2)->nullable();
+            $table->string('foto')->nullable();
             $table->timestamps();
         });
     }
