@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Coche extends Model
 {
-    use factory;
+    use HasFactory;
+
     protected $fillable = ['marca', 'modelo', 'anio', 'precio', 'foto'];
 }
