@@ -9,5 +9,10 @@ class Coche extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['marca', 'modelo', 'anio', 'precio', 'foto'];
+    protected $fillable = ['marca', 'modelo', 'anio', 'precio'];
+
+    public function images()
+    {
+        return $this->hasMany(Image::class, 'coche_id');
+    }
 }
