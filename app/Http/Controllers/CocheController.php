@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Coche;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CocheController extends Controller
 {
@@ -29,15 +30,20 @@ class CocheController extends Controller
             'modelo' => 'required|string|max:255',
             'anio' => 'required|integer',
             'precio' => 'required|numeric',
-            'foto' => 'required|array|min:1',
-            'foto.*' => 'url',
+            'images' => 'required|array|min:1',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $coche = Coche::create($request->only(['marca', 'modelo', 'anio', 'precio']));
 
-        $coche->images()->create([
-            'image_path' => json_encode($request->foto),
-        ]);
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $path = $image->store('images/cars', 'public');
+                $coche->images()->create([
+                    'image_path' => $path,
+                ]);
+            }
+        }
 
         return response()->json($this->formatCoche($coche), 201);
     }
@@ -56,18 +62,25 @@ class CocheController extends Controller
                 'modelo' => 'sometimes|required|string|max:255',
                 'anio' => 'sometimes|required|integer',
                 'precio' => 'sometimes|required|numeric',
-                'foto' => 'nullable|array',
-                'foto.*' => 'url',
+                'images' => 'sometimes|array',
+                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
             $coche->update($request->only(['marca', 'modelo', 'anio', 'precio']));
             \Log::info("Coche actualizado: " . json_encode($coche));
 
-            if ($request->has('foto')) {
-                $coche->images()->updateOrCreate(
-                    ['coche_id' => $coche->id],
-                    ['image_path' => json_encode($request->foto)]
-                );
+            if ($request->hasFile('images')) {
+                foreach ($coche->images as $oldImage) {
+                    Storage::disk('public')->delete($oldImage->image_path);
+                    $oldImage->delete();
+                }
+
+                foreach ($request->file('images') as $image) {
+                    $path = $image->store('images/cars', 'public');
+                    $coche->images()->create([
+                        'image_path' => $path,
+                    ]);
+                }
                 \Log::info("Imágenes actualizadas");
             }
 
@@ -84,6 +97,11 @@ class CocheController extends Controller
     public function destroy($id)
     {
         $coche = Coche::findOrFail($id);
+
+        foreach ($coche->images as $image) {
+            Storage::disk('public')->delete($image->image_path);
+        }
+
         $coche->delete();
         return response()->json(null, 204);
     }
@@ -104,26 +122,8 @@ class CocheController extends Controller
 
     private function getImageUrls($coche)
     {
-        if ($coche->images->isEmpty()) {
-            return [];
-        }
-
-        $imagePath = $coche->images->first()->image_path;
-
-        // Si image_path ya es un array, lo devolvemos directamente
-        if (is_array($imagePath)) {
-            return $imagePath;
-        }
-
-        // Si es una cadena JSON, la decodificamos
-        $decodedPath = json_decode($imagePath, true);
-
-        // Si la decodificación produce un array, lo devolvemos
-        if (is_array($decodedPath)) {
-            return $decodedPath;
-        }
-
-        // Si no es un array ni JSON válido, lo devolvemos como un array de un solo elemento
-        return [$imagePath];
+        return $coche->images->map(function ($image) {
+            return asset('storage/' . $image->image_path);
+        })->toArray();
     }
 }

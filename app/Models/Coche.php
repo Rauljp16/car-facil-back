@@ -13,6 +13,13 @@ class Coche extends Model
 
     public function images()
     {
-        return $this->hasMany(Image::class, 'coche_id');
+        return $this->hasMany(Image::class);
+    }
+
+    public function delete()
+    {
+        $this->images()->delete();
+
+        return parent::delete();
     }
 }
