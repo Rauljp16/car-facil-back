@@ -21,4 +21,5 @@ Route::middleware('auth:api')->group(function () {
 
     Route::post("register", [AuthController::class, 'register']);
     Route::post("logout", [AuthController::class, 'logout']);
+
 });

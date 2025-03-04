@@ -5,9 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Coche;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class CocheController extends Controller
 {
+    private $imageManager;
+
+    public function __construct()
+    {
+        $this->imageManager = new ImageManager(new Driver());
+    }
+
     public function index()
     {
         $coches = Coche::with('images')->get();
@@ -25,37 +34,52 @@ class CocheController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'marca' => 'required|string|max:255',
-            'modelo' => 'required|string|max:255',
-            'anio' => 'required|integer',
-            'precio' => 'required|numeric',
-            'images' => 'required|array|min:1',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
 
-        $coche = Coche::create($request->only(['marca', 'modelo', 'anio', 'precio']));
-
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
-                $path = $image->store('images/cars', 'public');
-                $coche->images()->create([
-                    'image_path' => $path,
-                ]);
-            }
+        if (!$request->hasFile('images')) {
+            return response()->json(['error' => 'No se recibieron archivos de imagen'], 422);
         }
 
-        return response()->json($this->formatCoche($coche), 201);
+        try {
+            $validated = $request->validate([
+                'marca' => 'required|string|max:255',
+                'modelo' => 'required|string|max:255',
+                'anio' => 'required|integer',
+                'precio' => 'required|numeric',
+                'images' => 'required|array',
+                'images.*' => 'required|file|max:5120',
+                    ]);
+
+
+            $coche = Coche::create($request->only(['marca', 'modelo', 'anio', 'precio']));
+
+            if ($request->hasFile('images')) {
+                $imageCount = count($request->file('images'));
+
+                foreach ($request->file('images') as $index => $image) {
+                    $filename = uniqid() . '.webp';
+                    $path = 'images/cars/' . $filename;
+
+                    $processedImage = $this->processImage($image);
+
+                    $processedImage->save(storage_path('app/public/' . $path));
+
+                    $coche->images()->create(['image_path' => $path]);
+                }
+            }
+
+            return response()->json($this->formatCoche($coche), 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error interno del servidor: ' . $e->getMessage()], 500);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        \Log::info("Iniciando método update para ID: " . $id);
-        \Log::info("Datos recibidos: " . json_encode($request->all()));
 
         try {
             $coche = Coche::findOrFail($id);
-            \Log::info("Coche encontrado: " . $coche->id);
 
             $request->validate([
                 'marca' => 'sometimes|required|string|max:255',
@@ -67,7 +91,6 @@ class CocheController extends Controller
             ]);
 
             $coche->update($request->only(['marca', 'modelo', 'anio', 'precio']));
-            \Log::info("Coche actualizado: " . json_encode($coche));
 
             if ($request->hasFile('images')) {
                 foreach ($coche->images as $oldImage) {
@@ -75,35 +98,41 @@ class CocheController extends Controller
                     $oldImage->delete();
                 }
 
-                foreach ($request->file('images') as $image) {
-                    $path = $image->store('images/cars', 'public');
+                foreach ($request->file('images') as $index => $image) {
+                    $filename = uniqid() . '.webp';
+                    $path = 'images/cars/' . $filename;
+
+                    $processedImage = $this->processImage($image);
+                    $processedImage->save(storage_path('app/public/' . $path));
+
                     $coche->images()->create([
                         'image_path' => $path,
                     ]);
                 }
-                \Log::info("Imágenes actualizadas");
             }
 
             $formattedCoche = $this->formatCoche($coche);
-            \Log::info("Respuesta final: " . json_encode($formattedCoche));
 
             return response()->json($formattedCoche);
         } catch (\Exception $e) {
-            \Log::error("Error en update: " . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function destroy($id)
     {
-        $coche = Coche::findOrFail($id);
+        try {
+            $coche = Coche::findOrFail($id);
 
-        foreach ($coche->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            foreach ($coche->images as $image) {
+                Storage::disk('public')->delete($image->image_path);
+            }
+
+            $coche->delete();
+            return response()->json(null, 204);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al eliminar el coche'], 500);
         }
-
-        $coche->delete();
-        return response()->json(null, 204);
     }
 
     private function formatCoche($coche)
@@ -125,5 +154,16 @@ class CocheController extends Controller
         return $coche->images->map(function ($image) {
             return asset('storage/' . $image->image_path);
         })->toArray();
+    }
+
+    private function processImage($image)
+    {
+        try {
+            return $this->imageManager->read($image)
+                ->scaleDown(width: 800)
+                ->toWebp(quality: 75);
+        } catch (\Exception $e) {
+            throw $e;
+        }
     }
 }
