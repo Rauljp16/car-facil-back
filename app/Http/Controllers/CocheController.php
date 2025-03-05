@@ -12,12 +12,16 @@ class CocheController extends Controller
 {
     public function index()
     {
-        return response()->json(Coche::with('images')->get());
+        $coches = Coche::with('images')->get()->map(function ($coche) {
+            return $this->formatCocheResponse($coche);
+        });
+        return response()->json($coches);
     }
 
     public function show($id)
     {
-        return response()->json(Coche::with('images')->findOrFail($id));
+        $coche = Coche::with('images')->findOrFail($id);
+        return response()->json($this->formatCocheResponse($coche));
     }
 
     public function store(Request $request)
@@ -36,7 +40,7 @@ class CocheController extends Controller
             $this->handleImages($coche, $request->file('images'));
         }
 
-        return response()->json($coche->load('images'), 201);
+        return response()->json($this->formatCocheResponse($coche), 201);
     }
 
     public function update(Request $request, $id)
@@ -66,7 +70,7 @@ class CocheController extends Controller
             $this->handleImages($coche, $request->file('images'));
         }
 
-        return response()->json($coche->load('images'));
+        return response()->json($this->formatCocheResponse($coche));
     }
 
     public function destroy($id)
@@ -83,9 +87,12 @@ class CocheController extends Controller
         foreach ($images as $image) {
             $filename = uniqid() . '.webp';
             $path = 'images/cars/' . $filename;
+
             $this->processImage($image)->save(storage_path('app/public/' . $path));
 
-            $coche->images()->create(['image_path' => $path]);
+            $coche->images()->create([
+                'image_path' => $path,
+            ]);
         }
     }
 
@@ -102,5 +109,19 @@ class CocheController extends Controller
         return (new ImageManager(new Driver()))->read($image)
             ->scaleDown(width: 800)
             ->toWebp(quality: 75);
+    }
+
+    private function formatCocheResponse($coche)
+    {
+        return [
+            'id' => $coche->id,
+            'marca' => $coche->marca,
+            'modelo' => $coche->modelo,
+            'anio' => $coche->anio,
+            'precio' => $coche->precio,
+            'images' => $coche->images->map(function ($image) {
+                return url('storage/' . $image->image_path);
+            }),
+        ];
     }
 }
