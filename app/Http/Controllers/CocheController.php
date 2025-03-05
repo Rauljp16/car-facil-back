@@ -10,160 +10,97 @@ use Intervention\Image\Drivers\Gd\Driver;
 
 class CocheController extends Controller
 {
-    private $imageManager;
-
-    public function __construct()
-    {
-        $this->imageManager = new ImageManager(new Driver());
-    }
-
     public function index()
     {
-        $coches = Coche::with('images')->get();
-        $formattedCoches = $coches->map(function ($coche) {
-            return $this->formatCoche($coche);
-        });
-        return response()->json($formattedCoches);
+        return response()->json(Coche::with('images')->get());
     }
 
     public function show($id)
     {
-        $coche = Coche::with('images')->findOrFail($id);
-        return response()->json($this->formatCoche($coche));
+        return response()->json(Coche::with('images')->findOrFail($id));
     }
 
     public function store(Request $request)
     {
+        $validated = $request->validate([
+            'marca' => 'required|string|max:255',
+            'modelo' => 'required|string|max:255',
+            'anio' => 'required|integer',
+            'precio' => 'required|numeric',
+            'images.*' => 'file|max:5120',
+        ]);
 
-        if (!$request->hasFile('images')) {
-            return response()->json(['error' => 'No se recibieron archivos de imagen'], 422);
+        $coche = Coche::create($validated);
+
+        if ($request->hasFile('images')) {
+            $this->handleImages($coche, $request->file('images'));
         }
 
-        try {
-            $validated = $request->validate([
-                'marca' => 'required|string|max:255',
-                'modelo' => 'required|string|max:255',
-                'anio' => 'required|integer',
-                'precio' => 'required|numeric',
-                'images' => 'required|array',
-                'images.*' => 'required|file|max:5120',
-                    ]);
-
-
-            $coche = Coche::create($request->only(['marca', 'modelo', 'anio', 'precio']));
-
-            if ($request->hasFile('images')) {
-                $imageCount = count($request->file('images'));
-
-                foreach ($request->file('images') as $index => $image) {
-                    $filename = uniqid() . '.webp';
-                    $path = 'images/cars/' . $filename;
-
-                    $processedImage = $this->processImage($image);
-
-                    $processedImage->save(storage_path('app/public/' . $path));
-
-                    $coche->images()->create(['image_path' => $path]);
-                }
-            }
-
-            return response()->json($this->formatCoche($coche), 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json(['errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Error interno del servidor: ' . $e->getMessage()], 500);
-        }
+        return response()->json($coche->load('images'), 201);
     }
 
     public function update(Request $request, $id)
     {
+        $coche = Coche::findOrFail($id);
 
         try {
-            $coche = Coche::findOrFail($id);
-
-            $request->validate([
-                'marca' => 'sometimes|required|string|max:255',
-                'modelo' => 'sometimes|required|string|max:255',
-                'anio' => 'sometimes|required|integer',
-                'precio' => 'sometimes|required|numeric',
-                'images' => 'sometimes|array',
+            $validated = $request->validate([
+                'marca' => 'sometimes|string|max:255',
+                'modelo' => 'sometimes|string|max:255',
+                'anio' => 'sometimes|integer',
+                'precio' => 'sometimes|numeric',
                 'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
-
-            $coche->update($request->only(['marca', 'modelo', 'anio', 'precio']));
-
-            if ($request->hasFile('images')) {
-                foreach ($coche->images as $oldImage) {
-                    Storage::disk('public')->delete($oldImage->image_path);
-                    $oldImage->delete();
-                }
-
-                foreach ($request->file('images') as $index => $image) {
-                    $filename = uniqid() . '.webp';
-                    $path = 'images/cars/' . $filename;
-
-                    $processedImage = $this->processImage($image);
-                    $processedImage->save(storage_path('app/public/' . $path));
-
-                    $coche->images()->create([
-                        'image_path' => $path,
-                    ]);
-                }
-            }
-
-            $formattedCoche = $this->formatCoche($coche);
-
-            return response()->json($formattedCoche);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['error' => $e->errors()], 422);
         }
+
+        $coche->fill($request->only(['marca', 'modelo', 'anio', 'precio']));
+
+        if ($coche->isDirty()) {
+            $coche->save();
+        }
+
+        if ($request->hasFile('images')) {
+            $this->deleteImages($coche);
+            $this->handleImages($coche, $request->file('images'));
+        }
+
+        return response()->json($coche->load('images'));
     }
 
     public function destroy($id)
     {
-        try {
-            $coche = Coche::findOrFail($id);
+        $coche = Coche::findOrFail($id);
+        $this->deleteImages($coche);
+        $coche->delete();
 
-            foreach ($coche->images as $image) {
-                Storage::disk('public')->delete($image->image_path);
-            }
+        return response()->json(null, 204);
+    }
 
-            $coche->delete();
-            return response()->json(null, 204);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al eliminar el coche'], 500);
+    private function handleImages(Coche $coche, $images)
+    {
+        foreach ($images as $image) {
+            $filename = uniqid() . '.webp';
+            $path = 'images/cars/' . $filename;
+            $this->processImage($image)->save(storage_path('app/public/' . $path));
+
+            $coche->images()->create(['image_path' => $path]);
         }
     }
 
-    private function formatCoche($coche)
+    private function deleteImages(Coche $coche)
     {
-        return [
-            'id' => $coche->id,
-            'marca' => $coche->marca,
-            'modelo' => $coche->modelo,
-            'anio' => $coche->anio,
-            'precio' => $coche->precio,
-            'created_at' => $coche->created_at,
-            'updated_at' => $coche->updated_at,
-            'images' => $this->getImageUrls($coche),
-        ];
-    }
-
-    private function getImageUrls($coche)
-    {
-        return $coche->images->map(function ($image) {
-            return asset('storage/' . $image->image_path);
-        })->toArray();
+        foreach ($coche->images as $image) {
+            Storage::disk('public')->delete($image->image_path);
+            $image->delete();
+        }
     }
 
     private function processImage($image)
     {
-        try {
-            return $this->imageManager->read($image)
-                ->scaleDown(width: 800)
-                ->toWebp(quality: 75);
-        } catch (\Exception $e) {
-            throw $e;
-        }
+        return (new ImageManager(new Driver()))->read($image)
+            ->scaleDown(width: 800)
+            ->toWebp(quality: 75);
     }
 }
