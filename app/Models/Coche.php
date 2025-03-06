@@ -9,7 +9,7 @@ class Coche extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['marca', 'modelo', 'anio', 'precio'];
+    protected $fillable = ['marca', 'modelo', 'anio', 'precio', 'cambio', 'combustible', 'motor', 'cv', 'plazas', 'puertas'];
 
     public function images()
     {

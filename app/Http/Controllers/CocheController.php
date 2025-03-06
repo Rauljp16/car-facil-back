@@ -31,8 +31,14 @@ class CocheController extends Controller
             'modelo' => 'required|string|max:255',
             'anio' => 'required|integer',
             'precio' => 'required|numeric',
-            'images.*' => 'file|max:5120',
-        ]);
+            'images.*' => 'file|max:2048',
+            'motor' => 'required|integer',
+            'cv' => 'required|integer',
+            'cambio' => 'required|string',
+            'plazas' => 'required|integer',
+            'puertas' => 'required|integer',
+            'combustible' => 'required|string',
+    ]);
 
         $coche = Coche::create($validated);
 
@@ -49,17 +55,23 @@ class CocheController extends Controller
 
         try {
             $validated = $request->validate([
-                'marca' => 'sometimes|string|max:255',
-                'modelo' => 'sometimes|string|max:255',
-                'anio' => 'sometimes|integer',
-                'precio' => 'sometimes|numeric',
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
-            ]);
+                'marca' => 'string|max:255',
+                'modelo' => 'string|max:255',
+                'anio' => 'integer',
+                'precio' => 'numeric',
+                'images.*' => 'file|max:2048',
+                'motor' => 'integer',
+                'cv' => 'integer',
+                'cambio' => 'string|max:255',
+                'plazas' => 'integer',
+                'puertas' => 'integer',
+                'combustible' => 'string|max:255',
+                ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['error' => $e->errors()], 422);
         }
 
-        $coche->fill($request->only(['marca', 'modelo', 'anio', 'precio']));
+        $coche->fill($request->only(['marca', 'modelo', 'anio', 'precio', 'motor', 'cv', 'cambio', 'plazas', 'puertas', 'combustible']));
 
         if ($coche->isDirty()) {
             $coche->save();
@@ -119,6 +131,12 @@ class CocheController extends Controller
             'modelo' => $coche->modelo,
             'anio' => $coche->anio,
             'precio' => $coche->precio,
+            'motor' => $coche->motor,
+            'cv' => $coche->cv,
+            'cambio' => $coche->cambio,
+            'plazas' => $coche->plazas,
+            'puertas' => $coche->puertas,
+            'combustible' => $coche->combustible,
             'images' => $coche->images->map(function ($image) {
                 return url('storage/' . $image->image_path);
             }),
