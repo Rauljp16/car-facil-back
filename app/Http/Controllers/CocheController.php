@@ -12,7 +12,7 @@ class CocheController extends Controller
 {
     public function index()
     {
-        $coches = Coche::with('images')->get()->map(function ($coche) {
+        $coches = Coche::with('images')->latest()->get()->map(function ($coche) {
             return $this->formatCocheResponse($coche);
         });
         return response()->json($coches);
