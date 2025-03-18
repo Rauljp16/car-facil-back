@@ -22,4 +22,9 @@ class Coche extends Model
 
         return parent::delete();
     }
+
+    public function getPrecioAttribute($value)
+    {
+        return number_format($value, 0, ',', '.');
+    }
 }
