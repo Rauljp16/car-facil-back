@@ -23,6 +23,7 @@ return new class extends Migration
                 $table->integer('plazas');
                 $table->integer('puertas');
                 $table->integer('anio');
+                $table->integer('km');
                 $table->decimal('precio', 10, 2)->nullable();
                 $table->json('foto')->nullable();
                 $table->timestamps();

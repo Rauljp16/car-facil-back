@@ -30,6 +30,7 @@ class CocheController extends Controller
             'marca' => 'required|string|max:255',
             'modelo' => 'required|string|max:255',
             'anio' => 'required|integer',
+            'km' => 'required|integer',
             'precio' => 'required|numeric',
             'images.*' => 'file|max:2048',
             'motor' => 'required|integer',
@@ -58,6 +59,7 @@ class CocheController extends Controller
                 'marca' => 'string|max:255',
                 'modelo' => 'string|max:255',
                 'anio' => 'integer',
+                'km' => 'integer',
                 'precio' => 'numeric',
                 'images.*' => 'file|max:2048',
                 'motor' => 'integer',
@@ -71,7 +73,7 @@ class CocheController extends Controller
             return response()->json(['error' => $e->errors()], 422);
         }
 
-        $coche->fill($request->only(['marca', 'modelo', 'anio', 'precio', 'motor', 'cv', 'cambio', 'plazas', 'puertas', 'combustible']));
+        $coche->fill($request->only(['marca', 'modelo', 'anio', 'km', 'precio', 'motor', 'cv', 'cambio', 'plazas', 'puertas', 'combustible']));
 
         if ($coche->isDirty()) {
             $coche->save();
@@ -130,6 +132,7 @@ class CocheController extends Controller
             'marca' => $coche->marca,
             'modelo' => $coche->modelo,
             'anio' => $coche->anio,
+            'km' => $coche->km,
             'precio' => $coche->precio,
             'motor' => $coche->motor,
             'cv' => $coche->cv,
