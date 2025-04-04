@@ -5,33 +5,36 @@ namespace App\Http\Controllers;
 use App\Models\Image;
 use App\Models\Coche;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ImageController extends Controller
 {
     public function store(Request $request, $cocheId)
     {
-        if (!is_numeric($cocheId)) {
-            return response()->json(['error' => 'ID de coche inválido.'], 400);
-        }
-
         $request->validate([
-            'image' => 'required|array|min:1',
-            'image.*' => 'url',
+            'images' => 'required|array|min:1',
+            'images.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         $coche = Coche::findOrFail($cocheId);
+        $uploadPath = "coches/{$cocheId}";
 
-        foreach ($request->image as $imageUrl) {
-            $coche->images()->create([
-                'image_path' => $imageUrl,
+        Storage::disk('public')->makeDirectory($uploadPath);
+
+        $savedImages = [];
+        foreach ($request->file('images') as $image) {
+            $filename = uniqid() . '.' . $image->getClientOriginalExtension();
+
+            $image->storeAs($uploadPath, $filename, 'public');
+
+            $savedImages[] = $coche->images()->create([
+                'image_path' => "$uploadPath/$filename"
             ]);
         }
 
-        $coche->load('images');
-
         return response()->json([
-            'message' => 'Imagen(es) guardada(s) correctamente.',
-            'images' => $coche->images
+            'message' => 'Imágenes subidas correctamente',
+            'images' => $savedImages
         ]);
     }
 }
