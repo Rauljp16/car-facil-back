@@ -106,7 +106,7 @@ class CocheController extends Controller
             $filename = uniqid() . '.webp';
             $path = "{$uploadPath}/{$filename}";
 
-            $processedImage = $this->processImage($image)->encode();
+            $processedImage = $this->processImage($image);
             Storage::disk('public')->put($path, $processedImage);
 
             $coche->images()->create([
