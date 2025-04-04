@@ -12,6 +12,13 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        $authenticatedUser = auth()->user();
+
+        if (!$authenticatedUser || $authenticatedUser->email !== 'rauljp16@gmail.com') {
+            return response()->json([
+                'error' => 'Acceso denegado: se requiere autenticación y permisos de superadmin'
+            ], 403);
+        }
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -19,15 +26,16 @@ class AuthController extends Controller
             'password' => 'required|min:6',
         ]);
 
-
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
 
-
-        return response()->json(['message' => 'Usuario registrado exitosamente'], 201);
+        return response()->json([
+            'message' => 'Usuario registrado exitosamente',
+            'user' => $user
+        ], 201);
     }
 
 

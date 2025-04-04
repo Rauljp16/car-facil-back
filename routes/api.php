@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Route;
 
 
 Route::post("login", [AuthController::class, 'login']);
-Route::post("register", [AuthController::class, 'register']);
 Route::get('/coches', [CocheController::class, 'index']);
 Route::get('/coches/{id}', [CocheController::class, 'show']);
 
@@ -20,6 +19,7 @@ Route::middleware('auth:api')->group(function () {
 
     Route::post('/coches/{cocheId}/images', [ImageController::class, 'store']);
 
+    Route::post("register", [AuthController::class, 'register']);
     Route::post("logout", [AuthController::class, 'logout']);
 
 });
