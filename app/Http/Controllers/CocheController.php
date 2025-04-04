@@ -32,7 +32,7 @@ class CocheController extends Controller
             'anio' => 'required|integer',
             'km' => 'required|integer',
             'precio' => 'required|numeric',
-            'images.*' => 'file|max:2048',
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
             'motor' => 'required|integer',
             'cv' => 'required|integer',
             'cambio' => 'required|string',
@@ -61,7 +61,7 @@ class CocheController extends Controller
                 'anio' => 'integer',
                 'km' => 'integer',
                 'precio' => 'numeric',
-                'images.*' => 'file|max:2048',
+                'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
                 'motor' => 'integer',
                 'cv' => 'integer',
                 'cambio' => 'string|max:255',
@@ -98,11 +98,16 @@ class CocheController extends Controller
 
     private function handleImages(Coche $coche, $images)
     {
+        $uploadPath = "coches/{$coche->id}";
+
+        Storage::disk('public')->makeDirectory($uploadPath);
+
         foreach ($images as $image) {
             $filename = uniqid() . '.webp';
-            $path = 'images/cars/' . $filename;
+            $path = "{$uploadPath}/{$filename}";
 
-            $this->processImage($image)->save(storage_path('app/public/' . $path));
+            $processedImage = $this->processImage($image)->encode();
+            Storage::disk('public')->put($path, $processedImage);
 
             $coche->images()->create([
                 'image_path' => $path,
@@ -120,7 +125,8 @@ class CocheController extends Controller
 
     private function processImage($image)
     {
-        return (new ImageManager(new Driver()))->read($image)
+        return (new ImageManager(new Driver()))
+            ->read($image)
             ->scaleDown(width: 800)
             ->toWebp(quality: 75);
     }
@@ -141,8 +147,7 @@ class CocheController extends Controller
             'puertas' => $coche->puertas,
             'combustible' => $coche->combustible,
             'images' => $coche->images->map(function ($image) {
-                return url('storage/' . $image->image_path);
+                return Storage::disk('public')->url($image->image_path);
             }),
         ];
-    }
-}
+    }}
